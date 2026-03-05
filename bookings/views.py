@@ -32,6 +32,18 @@ class BookingViewSet(viewsets.ModelViewSet):
             return Booking.objects.filter(car__dealer=user)
         return Booking.objects.filter(user=user)
 
+    @action(detail=False, methods=['get'], permission_classes=[IsUser], url_path='user')
+    def user_bookings(self, request):
+        bookings = Booking.objects.filter(user=request.user)
+        serializer = self.get_serializer(bookings, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsDealer], url_path='dealer')
+    def dealer_bookings(self, request):
+        bookings = Booking.objects.filter(car__dealer=request.user)
+        serializer = self.get_serializer(bookings, many=True)
+        return Response(serializer.data)
+
     @action(detail=True, methods=['post'], permission_classes=[IsDealer])
     def approve(self, request, pk=None):
         booking = self.get_object()
