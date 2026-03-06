@@ -8,13 +8,16 @@ https://docs.djangoproject.com/en/6.0/howto/deployment/asgi/
 """
 
 import os
-from channels.routing import ProtocolTypeRouter, URLRouter
+import django
 from django.core.asgi import get_asgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'carsphere_backend.settings')
+django.setup()
+
+from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
 from bookings import routing as bookings_routing
 from .ws_auth import JwtAuthMiddleware
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'carsphere_backend.settings')
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
