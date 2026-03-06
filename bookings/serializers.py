@@ -12,7 +12,7 @@ class BookingSerializer(serializers.ModelSerializer):
             'id', 'user', 'car', 'car_details', 'start_datetime', 
             'end_datetime', 'status', 'total_price', 'created_at'
         )
-        read_only_fields = ('user', 'status', 'total_price')
+        read_only_fields = ('user', 'total_price', 'created_at')
 
     def get_car_details(self, obj):
         return {

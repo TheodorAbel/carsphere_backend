@@ -12,6 +12,8 @@ class BookingViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['create']:
             return [IsUser()]
+        if self.action in ['update', 'partial_update']:
+            return [IsDealer()]
         return [permissions.IsAuthenticated()]
 
     def perform_create(self, serializer):
@@ -47,6 +49,8 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsDealer])
     def approve(self, request, pk=None):
         booking = self.get_object()
+        if booking.car.dealer != request.user:
+            return Response({"error": "Not allowed for this booking."}, status=status.HTTP_403_FORBIDDEN)
         
         # Re-verify conflicts before confirming (race condition check)
         overlaps = Booking.objects.filter(
@@ -107,6 +111,78 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsDealer])
     def reject(self, request, pk=None):
         booking = self.get_object()
+        if booking.car.dealer != request.user:
+            return Response({"error": "Not allowed for this booking."}, status=status.HTTP_403_FORBIDDEN)
         booking.status = 'REJECTED'
         booking.save()
         return Response({"status": "booking rejected"})
+
+    def partial_update(self, request, *args, **kwargs):
+        booking = self.get_object()
+        if booking.car.dealer != request.user:
+            return Response({"error": "Not allowed for this booking."}, status=status.HTTP_403_FORBIDDEN)
+
+        new_status = request.data.get('status')
+        if new_status not in ['CONFIRMED', 'REJECTED']:
+            return Response({"error": "Invalid status. Use CONFIRMED or REJECTED."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if new_status == 'CONFIRMED':
+            # Re-verify conflicts before confirming (race condition check)
+            overlaps = Booking.objects.filter(
+                car=booking.car,
+                status='CONFIRMED',
+                start_datetime__lt=booking.end_datetime,
+                end_datetime__gt=booking.start_datetime
+            ).exclude(id=booking.id)
+
+            if overlaps.exists():
+                return Response(
+                    {"error": "Cannot approve. Another confirmed booking overlaps this period."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            booking.status = 'CONFIRMED'
+            booking.save()
+
+            # Real-time update: Broadcast availability change
+            from asgiref.sync import async_to_sync
+            from channels.layers import get_channel_layer
+            channel_layer = get_channel_layer()
+
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    "availability",
+                    {
+                        "type": "availability_update",
+                        "car_id": booking.car.id,
+                        "status": "booked",
+                        "start": booking.start_datetime.isoformat(),
+                        "end": booking.end_datetime.isoformat(),
+                    }
+                )
+
+            # Real-time update: Notify user
+            from notifications.models import Notification
+            Notification.objects.create(
+                user=booking.user,
+                category='BOOKING',
+                title='Booking Confirmed',
+                message=f"Your booking for {booking.car.brand} {booking.car.model} has been confirmed."
+            )
+
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{booking.user.id}",
+                    {
+                        "type": "user_notification",
+                        "title": "Booking Confirmed",
+                        "message": f"Your booking for {booking.car.brand} {booking.car.model} has been confirmed.",
+                        "booking_id": booking.id
+                    }
+                )
+        else:
+            booking.status = 'REJECTED'
+            booking.save()
+
+        serializer = self.get_serializer(booking)
+        return Response(serializer.data)

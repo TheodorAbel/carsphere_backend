@@ -1,6 +1,6 @@
 from rest_framework import generics, permissions
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .serializers import UserSerializer
+from .serializers import UserSerializer, CustomTokenObtainPairSerializer
 from .models import User
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -16,6 +16,7 @@ class RegisterView(generics.CreateAPIView):
 
 class LoginView(TokenObtainPairView):
     permission_classes = (permissions.AllowAny,)
+    serializer_class = CustomTokenObtainPairSerializer
 
 class DealerAnalyticsView(APIView):
     permission_classes = [permissions.IsAuthenticated]

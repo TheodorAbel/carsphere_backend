@@ -1,4 +1,6 @@
 from rest_framework import viewsets, permissions, filters
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Car
 from .serializers import CarSerializer
@@ -24,6 +26,15 @@ class CarViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+
+        # Dealer-only filter for "my cars"
+        mine = self.request.query_params.get('mine')
+        if (
+            mine in ['1', 'true', 'True', 'yes', 'YES']
+            and self.request.user.is_authenticated
+            and self.request.user.role == 'DEALER'
+        ):
+            queryset = queryset.filter(dealer=self.request.user)
         
         # Bounding Box Filtering (Level 3)
         north = self.request.query_params.get('north')
@@ -69,5 +80,25 @@ class CarViewSet(viewsets.ModelViewSet):
                 queryset = queryset.annotate(distance=distance_expr).filter(distance__lte=radius)
             except (ValueError, TypeError):
                 pass
+
+        # Price range filtering (supports min_price/max_price or price_min/price_max)
+        min_price = self.request.query_params.get('min_price') or self.request.query_params.get('price_min')
+        max_price = self.request.query_params.get('max_price') or self.request.query_params.get('price_max')
+        if min_price:
+            try:
+                queryset = queryset.filter(price_per_day__gte=min_price)
+            except (ValueError, TypeError):
+                pass
+        if max_price:
+            try:
+                queryset = queryset.filter(price_per_day__lte=max_price)
+            except (ValueError, TypeError):
+                pass
         
         return queryset
+
+    @action(detail=False, methods=['get'], permission_classes=[IsDealer], url_path='dealer')
+    def dealer_cars(self, request):
+        queryset = Car.objects.filter(dealer=request.user)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)

@@ -12,14 +12,17 @@ from channels.routing import ProtocolTypeRouter, URLRouter
 from django.core.asgi import get_asgi_application
 from channels.auth import AuthMiddlewareStack
 from bookings import routing as bookings_routing
+from .ws_auth import JwtAuthMiddleware
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'carsphere_backend.settings')
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
     "websocket": AuthMiddlewareStack(
-        URLRouter(
-            bookings_routing.websocket_urlpatterns
+        JwtAuthMiddleware(
+            URLRouter(
+                bookings_routing.websocket_urlpatterns
+            )
         )
     ),
 })
