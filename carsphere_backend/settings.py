@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+ALLOWED_HOSTS = ['*']  # Broad for mobile testing
 
 # =========================
 # APPLICATIONS
@@ -152,7 +152,8 @@ REST_FRAMEWORK = {
 }
 
 # =========================
-# CORS CONFIG (DEV ONLY)
+# CORS CONFIG (PRODUCTION)
 # =========================
 
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
