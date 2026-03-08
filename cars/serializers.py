@@ -8,7 +8,7 @@ class CarSerializer(serializers.ModelSerializer):
         model = Car
         fields = (
             'id', 'dealer', 'dealer_email', 'brand', 'model', 'year',
-            'price_per_day', 'fuel_type', 'transmission',
+            'price_per_day', 'fuel_type', 'transmission', 'image',
             'latitude', 'longitude', 'created_at'
         )
         read_only_fields = ('dealer',)
