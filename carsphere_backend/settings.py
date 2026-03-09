@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'channels',
+    'django_filters',
 
     # Default Django apps
     'django.contrib.admin',
