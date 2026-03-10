@@ -26,6 +26,7 @@ class Car(models.Model):
     fuel_type = models.CharField(max_length=20, choices=FUEL_CHOICES)
     transmission = models.CharField(max_length=20, choices=TRANSMISSION_CHOICES)
     image = models.URLField(blank=True, null=True)
+    images = models.JSONField(default=list, blank=True)
 
     # Geo location
     latitude = models.DecimalField(max_digits=9, decimal_places=6, db_index=True)
