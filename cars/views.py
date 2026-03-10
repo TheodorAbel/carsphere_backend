@@ -1,10 +1,14 @@
-from rest_framework import viewsets, permissions, filters
+import os
+
+from rest_framework import viewsets, permissions, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Car
 from .serializers import CarSerializer
 from users.permissions import IsDealer, IsOwnerOrReadOnly
+from cars.management.commands.import_auto_dev import Command as ImportAutoDevCommand
+
 
 class CarViewSet(viewsets.ModelViewSet):
     queryset = Car.objects.all()
@@ -102,3 +106,33 @@ class CarViewSet(viewsets.ModelViewSet):
         queryset = Car.objects.filter(dealer=request.user)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny], url_path='import-auto-dev')
+    def import_auto_dev(self, request):
+        token = request.headers.get('X-Import-Token') or request.query_params.get('token')
+        expected = os.getenv('AUTO_DEV_IMPORT_TOKEN')
+        if not expected or token != expected:
+            return Response({"detail": "Unauthorized."}, status=status.HTTP_403_FORBIDDEN)
+
+        data = request.data or {}
+        options = {
+            "count": int(data.get("count", 100)),
+            "photos": int(data.get("photos", 4)),
+            "dealers": int(data.get("dealers", 5)),
+            "min_price": int(data.get("min_price", 900)),
+            "max_price": int(data.get("max_price", 4500)),
+            "reset": bool(data.get("reset", True)),
+            "page": int(data.get("page", 1)),
+            "limit": int(data.get("limit", 100)),
+            "max_pages": int(data.get("max_pages", 5)),
+            "vehicle_year": data.get("vehicle_year", ""),
+            "vehicle_make": data.get("vehicle_make", ""),
+            "vehicle_model": data.get("vehicle_model", ""),
+            "api_key": data.get("api_key", ""),
+            "base_url": data.get("base_url", ""),
+            "auth": data.get("auth", "apikey"),
+            "debug": bool(data.get("debug", False)),
+        }
+
+        ImportAutoDevCommand().handle(**options)
+        return Response({"detail": "Import completed.", "options": options})
