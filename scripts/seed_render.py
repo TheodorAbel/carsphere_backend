@@ -5,6 +5,7 @@ import sys
 import time
 from decimal import Decimal
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
@@ -43,6 +44,10 @@ def request_json(method, url, data=None, token=None, timeout=60, retries=3, back
             return 0, str(last_err)
 
 
+def build_url(filename):
+    return "https://commons.wikimedia.org/wiki/Special:FilePath/" + quote(filename, safe="")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Seed cars into Render API via HTTP.")
     parser.add_argument("--base-url", default="https://carsphere-backend.onrender.com/api/v1/")
@@ -61,8 +66,11 @@ def main():
     login_url = base + "auth/login/"
     cars_url = base + "cars/"
 
-    # Warm up Render cold start
-    request_json("GET", cars_url, timeout=args.timeout, retries=args.retries)
+    # Warm up Render cold start (ignore failures)
+    try:
+        request_json("GET", cars_url, timeout=args.timeout, retries=args.retries)
+    except Exception:
+        pass
 
     locations = [
         ("Bole", 9.0110, 38.7900),
@@ -72,13 +80,26 @@ def main():
         ("Mexico", 8.9980, 38.7370),
     ]
 
-    brands = [
-        ("Toyota", ["Corolla", "Yaris", "Rav4"]),
-        ("Hyundai", ["Elantra", "Accent", "Tucson"]),
-        ("Kia", ["Rio", "Sportage", "Sorento"]),
-        ("Nissan", ["Sunny", "X-Trail", "Kicks"]),
-        ("Honda", ["Civic", "Fit", "CR-V"]),
-        ("Volkswagen", ["Golf", "Polo", "Tiguan"]),
+    # Real car image URLs per brand/model (Wikimedia Commons direct file paths)
+    car_catalog = [
+        ("Toyota", "Corolla", build_url("2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg")),
+        ("Toyota", "Yaris", build_url("2018_Toyota_Yaris_Icon_VVT-i_1.5.jpg")),
+        ("Toyota", "Rav4", build_url("2019_Toyota_RAV4_2.5_Hybrid_Design_CVT.jpg")),
+        ("Hyundai", "Elantra", build_url("2021_Hyundai_Elantra_SEL_(Canada),_front_8.28.21.jpg")),
+        ("Hyundai", "Accent", build_url("2018_Hyundai_Accent_SE.jpg")),
+        ("Hyundai", "Tucson", build_url("2022_Hyundai_Tucson_SE_AWD.jpg")),
+        ("Kia", "Rio", build_url("2018_Kia_Rio_S.jpg")),
+        ("Kia", "Sportage", build_url("Kia_Sportage_EX_2022_(52454009347).jpg")),
+        ("Kia", "Sorento", build_url("2021_Kia_Sorento_SX.jpg")),
+        ("Nissan", "Sunny", build_url("2019_Nissan_Sunny_SV.jpg")),
+        ("Nissan", "X-Trail", build_url("2018_Nissan_X-Trail_Tekna_dCi_4x4.jpg")),
+        ("Nissan", "Kicks", build_url("2018_Nissan_Kicks_SV_front_3.30.19.jpg")),
+        ("Honda", "Civic", build_url("2017_Honda_Civic_SR_VTEC_1.0_Front.jpg")),
+        ("Honda", "Fit", build_url("2018_Honda_Fit_EX.jpg")),
+        ("Honda", "CR-V", build_url("2018_Honda_CR-V_EX.jpg")),
+        ("Volkswagen", "Golf", build_url("2018_Volkswagen_Golf_SE_TSI_1.5.jpg")),
+        ("Volkswagen", "Polo", build_url("2018_Volkswagen_Polo_SE_TSi_1.0_Front.jpg")),
+        ("Volkswagen", "Tiguan", build_url("2017_Volkswagen_Tiguan_SE_TDI_BMT_4Motion_2.0.jpg")),
     ]
 
     fuel_choices = ["PETROL", "DIESEL", "ELECTRIC", "HYBRID"]
@@ -120,13 +141,25 @@ def main():
                         print(f"Delete failed for car {car_id}: {del_status} {del_resp}")
             print(f"Cleared cars for {dealer['email']}")
 
+    total_needed = args.per_location * len(locations)
+    used_keys = set()
+    pool = []
+    while len(pool) < total_needed:
+        brand, model, image_url = random.choice(car_catalog)
+        year = random.randint(2014, 2024)
+        key = (brand, model, year)
+        if key in used_keys:
+            continue
+        used_keys.add(key)
+        pool.append((brand, model, image_url, year))
+
     created = 0
+    idx = 0
     for loc_index, (name, base_lat, base_lng) in enumerate(locations):
         for i in range(args.per_location):
             dealer = dealers[(loc_index + i) % len(dealers)]
-            brand, models = random.choice(brands)
-            model = random.choice(models)
-            year = random.randint(2014, 2024)
+            brand, model, image_url, year = pool[idx]
+            idx += 1
             price = Decimal(str(random.randint(args.min_price, args.max_price)))
             fuel = random.choice(fuel_choices)
             transmission = random.choice(transmission_choices)
@@ -135,11 +168,6 @@ def main():
             lng_offset = random.uniform(-0.003, 0.003)
             lat = round(base_lat + lat_offset, 6)
             lng = round(base_lng + lng_offset, 6)
-
-            image_url = (
-                f"https://picsum.photos/seed/"
-                f"{brand.lower()}-{model.lower()}-{loc_index}-{i}/600/400"
-            )
 
             payload = {
                 "brand": brand,
