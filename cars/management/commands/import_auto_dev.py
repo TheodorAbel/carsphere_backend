@@ -76,6 +76,7 @@ class Command(BaseCommand):
         max_pages = max(1, options["max_pages"])
 
         created = 0
+        skipped_existing = 0
         used_vins = set()
         model_counts = {}
 
@@ -179,6 +180,7 @@ class Command(BaseCommand):
                             year=int(year),
                             image=images[0],
                         ).exists():
+                            skipped_existing += 1
                             continue
 
                     Car.objects.create(
@@ -202,6 +204,7 @@ class Command(BaseCommand):
                 page_count += 1
 
         self.stdout.write(self.style.SUCCESS(f"Imported {created} cars from Auto.dev."))
+        return {"created": created, "skipped_existing": skipped_existing}
 
     def _parse_allowed_models(self, raw):
         if not raw:

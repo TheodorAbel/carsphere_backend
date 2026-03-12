@@ -135,5 +135,5 @@ class CarViewSet(viewsets.ModelViewSet):
             "debug": bool(data.get("debug", False)),
         }
 
-        ImportAutoDevCommand().handle(**options)
-        return Response({"detail": "Import completed.", "options": options})
+        result = ImportAutoDevCommand().handle(**options)
+        return Response({"detail": "Import completed.", "options": options, "result": result})
