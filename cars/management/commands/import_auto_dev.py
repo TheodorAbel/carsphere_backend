@@ -39,6 +39,7 @@ class Command(BaseCommand):
         parser.add_argument("--allowed-makes", type=str, default="")
         parser.add_argument("--max-per-model", type=int, default=6)
         parser.add_argument("--excluded-makes", type=str, default="")
+        parser.add_argument("--skip-existing", action="store_true")
         parser.add_argument("--debug", action="store_true")
 
     def handle(self, *args, **options):
@@ -82,6 +83,7 @@ class Command(BaseCommand):
         allowed_makes = self._parse_allowed_makes(options["allowed_makes"])
         excluded = self._parse_excluded_makes(options["excluded_makes"])
         max_per_model = max(1, options["max_per_model"])
+        skip_existing = bool(options["skip_existing"])
 
         makes_queue = allowed_makes or ([options["vehicle_make"]] if options["vehicle_make"] else [""])
 
@@ -169,6 +171,15 @@ class Command(BaseCommand):
                     lng = round(base_lng + lng_offset, 6)
 
                     images = photos[:photos_max]
+
+                    if skip_existing:
+                        if Car.objects.filter(
+                            brand=brand_norm,
+                            model=model_norm,
+                            year=int(year),
+                            image=images[0],
+                        ).exists():
+                            continue
 
                     Car.objects.create(
                         dealer=dealer,

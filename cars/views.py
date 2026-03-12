@@ -131,6 +131,7 @@ class CarViewSet(viewsets.ModelViewSet):
             "allowed_makes": data.get("allowed_makes", ""),
             "max_per_model": int(data.get("max_per_model", 6)),
             "excluded_makes": data.get("excluded_makes", ""),
+            "skip_existing": bool(data.get("skip_existing", False)),
             "debug": bool(data.get("debug", False)),
         }
 
